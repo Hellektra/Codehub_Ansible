@@ -1,0 +1,45 @@
+- name: CodeHub web application                      # Playbook name
+  hosts: node-machine                                # target hosts where the playbook will run
+  become: true                                       # run playbook as root
+
+  tasks:                                             # define list of tasks
+  - name: Install Docker                             # name of task
+    apt:                                             # use apt
+      name: docker.io                                # install docker
+      state: present                                 # ensure that docker packege is present on the system
+
+  - name: Download and start Docker containers
+    docker_container:
+      name: "Node machine container"                 # name of container                
+      image: "{{ item.image }}"                      # docker image that will be used
+      state: started                                 # state of the container
+      restart: always
+    with_items:
+      - { name: "webapp", image: "webapp-image" }    # start the web application container
+      - { name: "mysql", image: "mysql-image" }      # start the MySQL container
+
+  - name: Create Docker network
+    docker_network:                                  # create a network
+      name: webapp-mysql-network
+      driver: bridge                                 # use bridge driver to create a network isolated from the host machine's network
+
+  - name: Start MySQL container
+    docker_container:
+      name: mysql
+      image: mysql-image
+      state: started
+      network_mode: webapp-mysql-network             # specify the network to use
+
+  - name: Start Web Application container
+    docker_container:
+      name: webapp
+      image: webapp-image
+      state: started
+      network_mode: webapp-mysql-network
+      env:                                           # set environment variables for the container
+        DB_HOST: localhost
+        DB_PORT: 3306
+        DB_USER: root
+        DB_USER_PASSWORD: root
+      ports:
+        - "8080:8080"
